@@ -1,0 +1,46 @@
+postalCodeValidator(
+    orOrDe: string,
+    countryControlKey: string
+  ): AsyncValidatorFn {
+    return (control: AbstractControl): Observable<ValidationErrors> => {
+      const currentCountryCode = this.createShipmentForm
+        .get(orOrDe)
+        .get(countryControlKey).value;
+      const validatePost = new RegExp(/^[0-9]{1,4}$/);
+      const formatError = {
+        postalCodeFormat: {
+          value: control.value
+        }
+      };
+      if (currentCountryCode === CountryCodes.MEXICO) {
+        // Mexico uses city names, not postal codes
+        return ObservableOf(null);
+      } else {
+        if (control.value === "") {
+          return ObservableOf(null);
+        }
+        if (validatePost.test(control.value)) {
+          return ObservableOf(formatError);
+        }
+        return timer(1000).pipe(
+          switchMap(() => {
+            return this.shippingToolsApi.getCityStateCountry(
+              control.value,
+              ApiRequest.concealedCall
+            );
+          }),
+          map(response => {
+            if (response.countryCd === currentCountryCode) {
+              // It's a valid postal code so return null
+              return null;
+            } else {
+              return formatError;
+            }
+          }),
+          catchError(error => {
+            return ObservableOf(formatError);
+          })
+        );
+      }
+    };
+  }
